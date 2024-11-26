@@ -1,4 +1,3 @@
-![ICESI University Logo](https://www.icesi.edu.co/launiversidad/images/La_universidad/logo_icesi.png)
 # Impacto de la Localidad de Caché en el Rendimiento de Suma de Matrices
 
 ## Curso: Arquitectura de Computadores
