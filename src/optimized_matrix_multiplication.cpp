@@ -7,23 +7,23 @@
 // Función optimizada de multiplicación de matrices con bloques
 void ProductMat_Optimized(int n, int cacheBlockSize, double* A, double* B, double* C) {
     const int ELEMENT_SIZE = sizeof(double);  
-    int BLOCK_SIZE = cacheBlockSize / ELEMENT_SIZE;  
+    int bloqueSize = cacheBlockSize / ELEMENT_SIZE;  
 
     
-    if (BLOCK_SIZE > n) {
-        BLOCK_SIZE = n;
+    if (bloqueSize > n) {
+        bloqueSize = n;
     }
 
-    int i, j, k, jj, kk;
+    int fila, columna, bloqueFila, bloqueColumna;
 
     
-    for (jj = 0; jj < n; jj += BLOCK_SIZE) {
-        for (kk = 0; kk < n; kk += BLOCK_SIZE) {
-            for (i = 0; i < n; i++) {  // Itera sobre las filas de A
-                for (k = kk; k < kk + BLOCK_SIZE && k < n; k++) {  // Bloque columna de A
-                    double r = A[i * n + k];  // A[i][k]
-                    for (j = jj; j < jj + BLOCK_SIZE && j < n; j++) {  // Bloque fila de B
-                        C[i * n + j] += r * B[k * n + j];  // C[i][j] += A[i][k] * B[k][j]
+    for (bloqueColumna = 0; bloqueColumna < n; bloqueColumna += bloqueSize) {
+        for (bloqueFila = 0; bloqueFila < n; bloqueFila += bloqueSize) {
+            for (fila = 0; fila < n; fila++) {  // Itera sobre las filas de A
+                for (columna = bloqueFila; columna < bloqueFila + bloqueSize && columna < n; columna++) {  // Bloque columna de A
+                    double resultado = A[fila * n + columna];  // A[fila][columna]
+                    for (int k = bloqueColumna; k < bloqueColumna + bloqueSize && k < n; k++) {  // Bloque fila de B
+                        C[fila * n + k] += resultado * B[columna * n + k];  // C[fila][k] += A[fila][columna] * B[columna][k]
                     }
                 }
             }
@@ -33,9 +33,9 @@ void ProductMat_Optimized(int n, int cacheBlockSize, double* A, double* B, doubl
 
 // Función para imprimir una matriz
 void printMatrix(int n, double* M) {
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%8.2f ", M[i * n + j]);
+    for (int fila = 0; fila < n; fila++) {
+        for (int columna = 0; columna < n; columna++) {
+            printf("%8.2f ", M[fila * n + columna]);
         }
         printf("\n");
     }
@@ -43,16 +43,16 @@ void printMatrix(int n, double* M) {
 }
 
 int main(int argc, char* argv[]) {
-    std::ofstream fp("ReportOptimized.txt", std::ios::app);
-    if (!fp.is_open()) {
+    std::ofstream archivoSalida("ReportOptimized.txt", std::ios::app);
+    if (!archivoSalida.is_open()) {
         std::cerr << "The file 'ReportOptimized.txt' was not opened\n";
         return 0;
     }
 
     if (argc > 2) {
         int n = std::atoi(argv[1]);  // Tamaño de la matriz
-        int samples = std::atoi(argv[2]);  // Número de muestras
-        int cacheBlockSize = std::atoi(argv[3]); // Tamaño de la cache
+        int muestras = std::atoi(argv[2]);  // Número de muestras
+        int tamanoCache = std::atoi(argv[3]); // Tamaño de la cache
 
         double* A = new double[n * n];
         double* B = new double[n * n];
@@ -63,21 +63,21 @@ int main(int argc, char* argv[]) {
 
         std::cout << "ver\ttypeData\tISA\t#sample\tn\ttime(s)\tNormalized(ns)\n";
 
-        for (int s = 0; s < samples; s++) {
+        for (int s = 0; s < muestras; s++) {
             for (int i = 0; i < n * n; i++) C[i] = 0.0;
 
-            clock_t start = clock();  // Inicia medición de tiempo
+            clock_t inicio = clock();  // Inicia medición de tiempo
 
-            ProductMat_Optimized(n, cacheBlockSize, A, B, C);
+            ProductMat_Optimized(n, tamanoCache, A, B, C);
 
-            clock_t end = clock();  // Termina medición de tiempo
+            clock_t fin = clock();  // Termina medición de tiempo
 
-            double seconds = (double)(end - start) / CLOCKS_PER_SEC;
+            double segundos = (double)(fin - inicio) / CLOCKS_PER_SEC;
             double N = n;
-            double timeNormalized = (seconds * 1.0e9) / (N * N * N);  // ns
+            double tiempoNormalizado = (segundos * 1.0e9) / (N * N * N);  // ns
 
-            printf("%s\t%03d\t%05d\t%2.4f\t%2.4f \n", "blocks\t d\t x64\t", s, n, seconds, timeNormalized);        
-            fp << "blocks\t d\tx64\t" << s << "\t" << n << "\t" << seconds << "\t" << timeNormalized << "\n";
+            printf("%s\t%03d\t%05d\t%2.4f\t%2.4f \n", "blocks\t d\t x64\t", s, n, segundos, tiempoNormalizado);        
+            archivoSalida << "blocks\t d\tx64\t" << s << "\t" << n << "\t" << segundos << "\t" << tiempoNormalizado << "\n";
 
         }
 
