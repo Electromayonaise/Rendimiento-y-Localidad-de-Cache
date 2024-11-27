@@ -1,31 +1,29 @@
 #include <iostream>
-#include <vector>
-#include <chrono>
 #include <fstream>
-#include <iomanip>
-
-// Configuración mediante constantes
-constexpr size_t ELEMENT_SIZE = sizeof(double);
+#include <cstdlib>
+#include <ctime>
+#include <cstdio>
 
 // Función optimizada de multiplicación de matrices con bloques
-void optimized_matrix_multiplication(int matrix_size, int cache_size, 
-                                     const std::vector<double>& matrix_a, 
-                                     const std::vector<double>& matrix_b, 
-                                     std::vector<double>& matrix_c) {
-    int block_size = cache_size / ELEMENT_SIZE;
+void ProductMat_Optimized(int n, int cacheBlockSize, double* A, double* B, double* C) {
+    const int ELEMENT_SIZE = sizeof(double);  
+    int BLOCK_SIZE = cacheBlockSize / ELEMENT_SIZE;  
 
-    // Ajustar el tamaño del bloque para no exceder el tamaño de la matriz
-    if (block_size > matrix_size) {
-        block_size = matrix_size;
+    
+    if (BLOCK_SIZE > n) {
+        BLOCK_SIZE = n;
     }
 
-    for (int block_row = 0; block_row < matrix_size; block_row += block_size) {
-        for (int block_col = 0; block_col < matrix_size; block_col += block_size) {
-            for (int row = 0; row < matrix_size; row++) { 
-                for (int inner = block_col; inner < block_col + block_size && inner < matrix_size; inner++) { 
-                    double temp = matrix_a[row * matrix_size + inner]; 
-                    for (int col = block_row; col < block_row + block_size && col < matrix_size; col++) { 
-                        matrix_c[row * matrix_size + col] += temp * matrix_b[inner * matrix_size + col];
+    int i, j, k, jj, kk;
+
+    
+    for (jj = 0; jj < n; jj += BLOCK_SIZE) {
+        for (kk = 0; kk < n; kk += BLOCK_SIZE) {
+            for (i = 0; i < n; i++) {  // Itera sobre las filas de A
+                for (k = kk; k < kk + BLOCK_SIZE && k < n; k++) {  // Bloque columna de A
+                    double r = A[i * n + k];  // A[i][k]
+                    for (j = jj; j < jj + BLOCK_SIZE && j < n; j++) {  // Bloque fila de B
+                        C[i * n + j] += r * B[k * n + j];  // C[i][j] += A[i][k] * B[k][j]
                     }
                 }
             }
@@ -33,72 +31,68 @@ void optimized_matrix_multiplication(int matrix_size, int cache_size,
     }
 }
 
-// Inicialización de una matriz
-void initialize_matrix(int matrix_size, std::vector<double>& matrix, double value) {
-    std::fill(matrix.begin(), matrix.end(), value);
-}
-
-// Imprimir una matriz
-void display_matrix(int matrix_size, const std::vector<double>& matrix) {
-    for (int i = 0; i < matrix_size; i++) {
-        for (int j = 0; j < matrix_size; j++) {
-            std::cout << std::setw(8) << std::fixed << std::setprecision(2) 
-                      << matrix[i * matrix_size + j] << " ";
+// Función para imprimir una matriz
+void printMatrix(int n, double* M) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%8.2f ", M[i * n + j]);
         }
-        std::cout << "\n";
+        printf("\n");
     }
-    std::cout << "\n";
+    printf("\n");
 }
 
 int main(int argc, char* argv[]) {
-    std::ofstream report_file("Optimized_Report.txt", std::ios::app);
-    if (!report_file.is_open()) {
-        std::cerr << "No se pudo abrir el archivo de reporte\n";
-        return EXIT_FAILURE;
+    std::ofstream fp("ReportOptimized.txt", std::ios::app);
+    if (!fp.is_open()) {
+        std::cerr << "The file 'ReportOptimized.txt' was not opened\n";
+        return 0;
     }
 
-    if (argc > 3) {
-        int matrix_size = std::stoi(argv[1]);
-        int sample_count = std::stoi(argv[2]);
-        int cache_size = std::stoi(argv[3]);
+    if (argc > 2) {
+        int n = std::atoi(argv[1]);  // Tamaño de la matriz
+        int samples = std::atoi(argv[2]);  // Número de muestras
+        int cacheBlockSize = std::atoi(argv[3]); // Tamaño de la cache
 
-        std::vector<double> matrix_a(matrix_size * matrix_size);
-        std::vector<double> matrix_b(matrix_size * matrix_size);
-        std::vector<double> matrix_c(matrix_size * matrix_size);
+        double* A = new double[n * n];
+        double* B = new double[n * n];
+        double* C = new double[n * n];
 
-        initialize_matrix(matrix_size, matrix_a, 3.0);
-        initialize_matrix(matrix_size, matrix_b, 4.0);
+        for (int i = 0; i < n * n; i++) A[i] = 3.0;
+        for (int i = 0; i < n * n; i++) B[i] = 4.0;
 
-        std::cout << "Versión\tTamaño\tMuestra\tTiempo(s)\tTiempo(ns)\n";
+        std::cout << "ver\ttypeData\tISA\t#sample\tn\ttime(s)\tNormalized(ns)\n";
 
-        for (int sample = 0; sample_count > sample; sample++) {
-            initialize_matrix(matrix_size, matrix_c, 0.0);
+        for (int s = 0; s < samples; s++) {
+            for (int i = 0; i < n * n; i++) C[i] = 0.0;
 
-            auto start_time = std::chrono::high_resolution_clock::now();
-            optimized_matrix_multiplication(matrix_size, cache_size, matrix_a, matrix_b, matrix_c);
-            auto end_time = std::chrono::high_resolution_clock::now();
+            clock_t start = clock();  // Inicia medición de tiempo
 
-            double elapsed_time = std::chrono::duration<double>(end_time - start_time).count();
-            double size = matrix_size;
-            double normalized_time = (elapsed_time * 1.0e9) / (size * size * size);  // ns
+            ProductMat_Optimized(n, cacheBlockSize, A, B, C);
 
-            std::cout << "Bloques\t" << matrix_size << "\t" << sample << "\t" 
-                      << std::fixed << std::setprecision(6) << elapsed_time << "\t" 
-                      << std::fixed << std::setprecision(4) << normalized_time << "\n";
-            report_file << "Bloques\t" << matrix_size << "\t" << sample << "\t" 
-                        << std::fixed << std::setprecision(6) << elapsed_time << "\t" 
-                        << std::fixed << std::setprecision(4) << normalized_time << "\n";
+            clock_t end = clock();  // Termina medición de tiempo
+
+            double seconds = (double)(end - start) / CLOCKS_PER_SEC;
+            double N = n;
+            double timeNormalized = (seconds * 1.0e9) / (N * N * N);  // ns
+
+            printf("%s\t%03d\t%05d\t%2.4f\t%2.4f \n", "blocks\t d\t x64\t", s, n, seconds, timeNormalized);        
+            fp << "blocks\t d\tx64\t" << s << "\t" << n << "\t" << seconds << "\t" << timeNormalized << "\n";
+
         }
 
         if (argc > 4) {
-            display_matrix(matrix_size, matrix_a);
-            display_matrix(matrix_size, matrix_b);
-            display_matrix(matrix_size, matrix_c);
+            printMatrix(n, A);
+            printMatrix(n, B);
+            printMatrix(n, C);
         }
 
+        delete[] A;
+        delete[] B;
+        delete[] C;
     } else {
-        std::cout << "Uso: " << argv[0] << " <tamaño_matriz> <muestras> <tamaño_cache> [imprimir_matrices]\n";
+        std::cout << "Usage: " << argv[0] << " <matrix_size> <samples> [print_matrices]\n";
     }
 
-    return EXIT_SUCCESS;
+    return 0;
 }
